@@ -13,12 +13,12 @@
 #include "ble_bas.h"
 #include "ble_hrs.h"
 #include "ble_dis.h"
-#if MUSH_FEATURE_ENABLED(BLE_SPP_SERVICE)
+#if BLE_SPP_SERVICE_ENABLED
 #include "ble_spp.h"
-#endif //MUSH_FEATURE_ENABLED(BLE_SPP_SERVICE)
-#if MUSH_FEATURE_ENABLED(BLE_NUS_SERVICE)
+#endif //BLE_SPP_SERVICE_ENABLED
+#if BLE_NUS_SERVICE_ENABLED
 #include "ble_nus.h"
-#endif // MUSH_FEATURE_ENABLED(BLE_NUS_SERVICE)
+#endif // BLE_NUS_SERVICE_ENABLED
 #include "ble_conn_params.h"
 #include "sensorsim.h"
 #include "nrf_sdh.h"
@@ -87,20 +87,38 @@
 #define NEXT_CONN_PARAMS_UPDATE_DELAY       30000                                   /**< Time between each call to sd_ble_gap_conn_param_update after the first call (30 seconds). */
 #define MAX_CONN_PARAMS_UPDATE_COUNT        3                                       /**< Number of attempts before giving up the connection parameter negotiation. */
 
+#if PASSKEY_SERVICE_ENABLED
+#define SEC_PARAM_TIMEOUT                   30                                /**< Timeout for Pairing Request or Security Request (in seconds). */
+#define SEC_PARAM_BOND                      1                                       /**< Perform bonding. */
+#define SEC_PARAM_MITM                      0                                       /**< Man In The Middle protection not required. */
+#define SEC_PARAM_LESC                       1                                       /**< LE Secure Connections not enabled. */
+#else
 #define SEC_PARAM_BOND                      1                                       /**< Perform bonding. */
 #define SEC_PARAM_MITM                      0                                       /**< Man In The Middle protection not required. */
 #define SEC_PARAM_LESC                      0                                       /**< LE Secure Connections not enabled. */
+#endif // PASSKEY_SERVICE_ENABLED
 #define SEC_PARAM_KEYPRESS                  0                                       /**< Keypress notifications not enabled. */
+#if PASSKEY_SERVICE_ENABLED
+#define SEC_PARAM_IO_CAPABILITIES      BLE_GAP_IO_CAPS_NONE //BLE_GAP_IO_CAPS_DISPLAY_ONLY  
+#else
 #define SEC_PARAM_IO_CAPABILITIES           BLE_GAP_IO_CAPS_NONE                    /**< No I/O capabilities. */
+#endif //PASSKEY_SERVICE_ENABLED
 #define SEC_PARAM_OOB                       0                                       /**< Out Of Band data not available. */
 #define SEC_PARAM_MIN_KEY_SIZE              7                                       /**< Minimum encryption key size. */
 #define SEC_PARAM_MAX_KEY_SIZE              16                                      /**< Maximum encryption key size. */
 
+#if PASSKEY_SERVICE_ENABLED
+
+#define PASSKEY_TXT                     "Passkey:"                                  /**< Message to be displayed together with the pass-key. */
+#define PASSKEY_TXT_LENGTH              8                                           /**< Length of message to be displayed together with the pass-key. */
+#define PASSKEY_LENGTH                  6                                           /**< Length of pass-key received by the stack for display. */
+#endif // PASSKEY_SERVICE_ENABLED
+
 #define DEAD_BEEF                           0xDEADBEEF                              /**< Value used as error code on stack dump, can be used to identify stack location on stack unwind. */
-#if MUSH_FEATURE_ENABLED(BLE_NUS_SERVICE)
+#if BLE_NUS_SERVICE_ENABLED
 #define UART_TX_BUF_SIZE                256                                         /**< UART TX buffer size. */
 #define UART_RX_BUF_SIZE                256                                         /**< UART RX buffer size. */
-#endif //MUSH_FEATURE_ENABLED(BLE_NUS_SERVICE)
+#endif //BLE_NUS_SERVICE_ENABLED
 
 #define OSTIMER_WAIT_FOR_QUEUE              2                                       /**< Number of ticks to wait for the timer queue to be ready */
 #define NUS_SERVICE_UUID_TYPE           BLE_UUID_TYPE_VENDOR_BEGIN                  /**< UUID type for the Nordic UART Service (vendor specific). */
@@ -112,26 +130,30 @@ NRF_BLE_GATT_DEF(m_gatt);                                           /**< GATT mo
 NRF_BLE_QWR_DEF(m_qwr);                                             /**< Context for the Queued Write module.*/
 BLE_ADVERTISING_DEF(m_advertising);                                 /**< Advertising module instance. */
 
+#if PASSKEY_SERVICE_ENABLED
+static pm_peer_id_t m_peer_to_be_deleted = PM_PEER_ID_INVALID;
+static ble_gap_sec_params_t m_sec_params;                                     /**< Security requirements for this application. */
+#endif // PASSKEY_SERVICE_ENABLED
 static uint16_t m_conn_handle         = BLE_CONN_HANDLE_INVALID;    /**< Handle of the current connection. */
 static uint16_t   m_ble_nus_max_data_len = BLE_GATT_ATT_MTU_DEFAULT - 3;            /**< Maximum length of data (in bytes) that can be transmitted to the peer by the Nordic UART service module. */
 
 static ble_uuid_t m_adv_uuids[] =                                   /**< Universally unique service identifiers. */
 {
-#if MUSH_FEATURE_ENABLED(BLE_SPP_SERVICE)
+#if BLE_SPP_SERVICE_ENABLED
     {BLE_UUID_SPP_SERVICE, NUS_SERVICE_UUID_TYPE},  
-#endif //MUSH_FEATURE_ENABLED(BLE_SPP_SERVICE)
-#if MUSH_FEATURE_ENABLED(BLE_NUS_SERVICE)
+#endif //BLE_SPP_SERVICE_ENABLED
+#if BLE_NUS_SERVICE_ENABLED
     {BLE_UUID_NUS_SERVICE, NUS_SERVICE_UUID_TYPE}
-#endif // MUSH_FEATURE_ENABLED(BLE_NUS_SERVICE)
+#endif // BLE_NUS_SERVICE_ENABLED
     
 };
 
-#if MUSH_FEATURE_ENABLED(AD8237)
+#if AD8237_ENABLED
 static const nrf_drv_timer_t m_timer4 = NRF_DRV_TIMER_INSTANCE(4);
 static nrf_saadc_value_t     m_buffer_ain_pool[2][ADC_POOL_SIZE];
 static uint32_t              	m_adc_evt_counter = 0;
 static nrf_ppi_channel_t     m_ppi_channel;
-#if MUSH_FEATURE_ENABLED(APP_RINGBUFFER)
+#if APP_RINGBUFFER_ENABLED
 
 typedef struct {
 	uint16_t c0;
@@ -228,8 +250,8 @@ void *get_samples_rb_ctrl(void)
 	return (void *)&rb_cntrl;
 }
 
-#endif // MUSH_FEATURE_ENABLED(APP_RINGBUFFER)
-#endif // MUSH_FEATURE_ENABLED(AD8237)
+#endif // APP_RINGBUFFER_ENABLED
+#endif // AD8237_ENABLED
 
 static TimerHandle_t m_app_timer;                               /**< Definition of application timer. */
 
@@ -240,6 +262,8 @@ static ble_gap_addr_t MAC_Address;
 uint32_t  uiGlobalTick = 0;
 uint16_t	uiGlobalSysFlags = 0;
 uint8_t	uiCrankOutControl = 0x7;  // [default] Enable the Digital Filter 
+uint8_t  uiXLGYOutControl = 0x0;  // [0-2] - XL output control, [3-5] - GY output control [X=+0, Y=+1, Z=+2]
+
 
 static void advertising_start(void * p_erase_bonds);
 
@@ -269,11 +293,51 @@ static void pm_evt_handler(pm_evt_t const * p_evt)
 {
     bool delete_bonds = false;
 
+#if  PASSKEY_SERVICE_ENABLED
+    ret_code_t err_code;
+#endif // PASSKEY_SERVICE_ENABLED
+
     pm_handler_on_pm_evt(p_evt);
+#if  PASSKEY_SERVICE_ENABLED
+    pm_handler_disconnect_on_sec_failure(p_evt);
+#endif // PASSKEY_SERVICE_ENABLED
     pm_handler_flash_clean(p_evt);
 
     switch (p_evt->evt_id)
     {
+#if  PASSKEY_SERVICE_ENABLED
+        case PM_EVT_CONN_SEC_SUCCEEDED:
+        {
+            pm_conn_sec_status_t conn_sec_status;
+
+            // Check if the link is authenticated (meaning at least MITM).
+            err_code = pm_conn_sec_status_get(p_evt->conn_handle, &conn_sec_status);
+            APP_ERROR_CHECK(err_code);
+
+            if (conn_sec_status.mitm_protected)
+            {
+                NRF_LOG_RAW_INFO("Link secured. Role: %d. conn_handle: %d, Procedure: %d",
+                             ble_conn_state_role(p_evt->conn_handle),
+                             p_evt->conn_handle,
+                             p_evt->params.conn_sec_succeeded.procedure);
+            }
+            else
+            {
+                // The peer did not use MITM, disconnect.
+                NRF_LOG_RAW_INFO("Collector did not use MITM, disconnecting");
+                err_code = pm_peer_id_get(m_conn_handle, &m_peer_to_be_deleted);
+                APP_ERROR_CHECK(err_code);
+                err_code = sd_ble_gap_disconnect(m_conn_handle,
+                                                 BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
+                APP_ERROR_CHECK(err_code);
+            }
+        } break;
+
+        case PM_EVT_CONN_SEC_FAILED:
+            m_conn_handle = BLE_CONN_HANDLE_INVALID;
+            break;
+
+#endif // PASSKEY_SERVICE_ENABLED
         case PM_EVT_PEERS_DELETE_SUCCEEDED:
             advertising_start(&delete_bonds);
             break;
@@ -334,14 +398,14 @@ static void app_level_meas_timeout_handler(TimerHandle_t xTimer)
     UNUSED_PARAMETER(xTimer);
 
 #if 0
-//#if MUSH_FEATURE_ENABLED(APP_DEBUG)
+//#if APP_DEBUG_ENABLED
     NRF_LOG_RAW_INFO("%s:\r\n", __func__); 
 #if NRF_LOG_ENABLED
-#if MUSH_FEATURE_ENABLED(LOG_TASK_NOTIFICATION)
+#if LOG_TASK_NOTIFICATION_ENABLED
 	nrf_log_notify();
-#endif // MUSH_FEATURE_ENABLED(LOG_TASK_NOTIFICATION)
+#endif // LOG_TASK_NOTIFICATION_ENABLED
 #endif // NRF_LOG_ENABLED	
-#endif // MUSH_FEATURE_ENABLED(APP_DEBUG)
+#endif // APP_DEBUG_ENABLED
 	uiGlobalTick++;
 //	vAppTick();
 }
@@ -497,7 +561,7 @@ static void spp_data_handler(ble_nus_evt_t * p_evt)
         }
 #endif //NRF_MODULE_ENABLED(APP_UART)
     }
-#if MUSH_FEATURE_ENABLED(BLE_SPP_SERVICE)
+#if BLE_SPP_SERVICE_ENABLED
     else
     if (p_evt->type == BLE_NUS_EVT_COMM_STARTED) 
     {
@@ -510,12 +574,18 @@ static void spp_data_handler(ble_nus_evt_t * p_evt)
     	NRF_LOG_RAW_INFO("%s(): SPP connection disabled ..\r\n", __func__);
 // TODO: We can start Application from here in the case when connect to the ESP32
     }else
-#endif // MUSH_FEATURE_ENABLED(BLE_SPP_SERVICE)
+#endif // BLE_SPP_SERVICE_ENABLED
     else	
     if (p_evt->type == BLE_NUS_EVT_TX_RDY)
     {
 	/* done with TX to the App, start a next one */    
 //	NRF_LOG_RAW_INFO("-!");
+
+#ifdef DO_OUTTASK
+	if (m_out_task != NULL)
+		xTaskNotifyGive(m_out_task) ;
+#endif // DO_OUTTASK
+
     }
      	
 
@@ -528,7 +598,7 @@ ret_code_t spp_send_data(uint8_t *data, uint16_t length)
 
  //   NRF_LOG_RAW_INFO("%s(): [%s]\r\n", __func__, (char*)data);
 
-#if MUSH_FEATURE_ENABLED(BLE_SPP_SERVICE)
+#if BLE_SPP_SERVICE_ENABLED
                         err_code = ble_spp_data_send(&m_nus, data, &length, m_conn_handle);
                         if ((err_code != NRF_ERROR_INVALID_STATE) &&
                             (err_code != NRF_ERROR_RESOURCES) &&
@@ -536,8 +606,8 @@ ret_code_t spp_send_data(uint8_t *data, uint16_t length)
                         {
                             APP_ERROR_CHECK(err_code);
                         }
-#endif // MUSH_FEATURE_ENABLED(BLE_SPP_SERVICE)
-#if MUSH_FEATURE_ENABLED(BLE_NUS_SERVICE)
+#endif // BLE_SPP_SERVICE_ENABLED
+#if BLE_NUS_SERVICE_ENABLED
                         err_code = ble_nus_data_send(&m_nus, data, &length, m_conn_handle);
                         if ((err_code != NRF_ERROR_INVALID_STATE) &&
                             (err_code != NRF_ERROR_RESOURCES) &&
@@ -545,7 +615,7 @@ ret_code_t spp_send_data(uint8_t *data, uint16_t length)
                         {
                             APP_ERROR_CHECK(err_code);
                         }
-#endif // MUSH_FEATURE_ENABLED(BLE_NUS_SERVICE)
+#endif // BLE_NUS_SERVICE_ENABLED
 	return err_code;					
 }
 
@@ -567,19 +637,19 @@ static void services_init(void)
 
     memset(&nus_init, 0, sizeof(nus_init));
 
-#if MUSH_FEATURE_ENABLED(BLE_SPP_SERVICE)
+#if BLE_SPP_SERVICE_ENABLED
     nus_init.data_handler = spp_data_handler;
 
     err_code = ble_spp_init(&m_nus, &nus_init);
     APP_ERROR_CHECK(err_code);
-#endif // MUSH_FEATURE_ENABLED(BLE_SPP_SERVICE)
-#if MUSH_FEATURE_ENABLED(BLE_NUS_SERVICE)
+#endif // BLE_SPP_SERVICE_ENABLED
+#if BLE_NUS_SERVICE_ENABLED
 // [ADK]   The spp_data_handler() is equal to nus_data_handler() 
     nus_init.data_handler = spp_data_handler;
 
     err_code = ble_nus_init(&m_nus, &nus_init);
     APP_ERROR_CHECK(err_code);
-#endif // MUSH_FEATURE_ENABLED(BLE_NUS_SERVICE)
+#endif // BLE_NUS_SERVICE_ENABLED
 
 }
 
@@ -658,8 +728,8 @@ static void conn_params_init(void)
 static void sleep_mode_enter(void)
 {
     ret_code_t err_code;
-#if MUSH_FEATURE_ENABLED(LSM6DS3)
-#if MUSH_FEATURE_ENABLED(LSM6DS3_WKUP)
+#if LSM6DS3_ENABLED
+#if LSM6DS3_WKUP_ENABLED
     // Prepare wakeup pin.
 //    nrf_gpio_pin_set(DEBUG_LED_PIN);
     nrf_gpio_cfg_sense_set(LSM6DS3_INT1_PIN, NRF_GPIO_PIN_SENSE_HIGH);
@@ -692,14 +762,14 @@ static void sleep_mode_enter(void)
  */
 static void on_adv_evt(ble_adv_evt_t ble_adv_evt)
 {
-#if !MUSH_FEATURE_ENABLED(LSM6DS3)
+#if !LSM6DS3_ENABLED
     uint32_t err_code;
 #endif
     switch (ble_adv_evt)
     {
         case BLE_ADV_EVT_FAST:
             NRF_LOG_INFO("Fast advertising.");
-#if MUSH_FEATURE_ENABLED(LSM6DS3)
+#if LSM6DS3_ENABLED
             break;
 #else
             err_code = bsp_indication_set(BSP_INDICATE_ADVERTISING);
@@ -717,6 +787,29 @@ static void on_adv_evt(ble_adv_evt_t ble_adv_evt)
     }
 }
 
+#if  PASSKEY_SERVICE_ENABLED
+static void ble_set_passkey(void) 
+{
+       uint32_t err_code;
+	uint8_t passkey[] = "123456";
+	ble_opt_t ble_opt;
+	ble_opt.gap_opt.passkey.p_passkey = &passkey[0];
+	err_code = sd_ble_opt_set(BLE_GAP_OPT_PASSKEY, &ble_opt);
+	APP_ERROR_CHECK(err_code); 
+}
+/**@brief Function for initializing security parameters.
+ */
+static void sec_params_init(void)
+{
+    m_sec_params.bond         = SEC_PARAM_BOND;
+    m_sec_params.mitm         = SEC_PARAM_MITM;
+    m_sec_params.io_caps      = SEC_PARAM_IO_CAPABILITIES;
+    m_sec_params.oob          = SEC_PARAM_OOB;
+    m_sec_params.min_key_size = SEC_PARAM_MIN_KEY_SIZE;
+    m_sec_params.max_key_size = SEC_PARAM_MAX_KEY_SIZE;
+}
+
+#endif // PASSKEY_SERVICE_ENABLED
 
 /**@brief Function for handling BLE events.
  *
@@ -729,6 +822,7 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
 {
     uint32_t err_code;
     ble_gap_evt_t const * p_gap_evt = &p_ble_evt->evt.gap_evt;
+    static ble_gap_sec_keyset_t s_sec_keyset;
 
 //    NRF_LOG_RAW_INFO("%s() entered, evt_id 0x%x\r\n", __func__, p_ble_evt->header.evt_id);
 //    NRF_LOG_FLUSH();
@@ -789,6 +883,52 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
                                              BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
             APP_ERROR_CHECK(err_code);
             break;
+#if  PASSKEY_SERVICE_ENABLED
+        case BLE_GAP_EVT_SEC_PARAMS_REQUEST:
+            NRF_LOG_RAW_INFO("BLE_GAP_EVT_SEC_PARAMS_REQUEST\n");
+/*
+            s_sec_keyset.keys_peer.p_enc_key  = NULL;
+            s_sec_keyset.keys_peer.p_id_key   = NULL;
+            s_sec_keyset.keys_peer.p_sign_key = NULL;
+            err_code                          = sd_ble_gap_sec_params_reply(m_conn_handle,
+                                                                            BLE_GAP_SEC_STATUS_SUCCESS,
+                                                                            &m_sec_params,
+                                                                            &s_sec_keyset);
+            APP_ERROR_CHECK(err_code);
+*/
+
+            // Pairing not supported.
+            err_code = sd_ble_gap_sec_params_reply(p_ble_evt->evt.gap_evt.conn_handle, BLE_GAP_SEC_STATUS_PAIRING_NOT_SUPP, NULL, NULL);
+            APP_ERROR_CHECK(err_code);
+            break;
+
+        case BLE_GAP_EVT_PASSKEY_DISPLAY:
+        {
+            char passkey[PASSKEY_LENGTH + 1];
+            memcpy(passkey, p_ble_evt->evt.gap_evt.params.passkey_display.passkey, PASSKEY_LENGTH);
+            passkey[PASSKEY_LENGTH] = 0;
+
+            NRF_LOG_RAW_INFO("Passkey: [%s]\n", nrf_log_push(passkey));
+        } break;
+        
+        case BLE_GAP_EVT_AUTH_KEY_REQUEST:
+            NRF_LOG_RAW_INFO("BLE_GAP_EVT_AUTH_KEY_REQUEST\n");
+            break;
+
+        case BLE_GAP_EVT_LESC_DHKEY_REQUEST:
+            NRF_LOG_RAW_INFO("BLE_GAP_EVT_LESC_DHKEY_REQUEST\n");
+            break;
+
+         case BLE_GAP_EVT_AUTH_STATUS:
+             NRF_LOG_RAW_INFO("BLE_GAP_EVT_AUTH_STATUS: status=0x%x bond=0x%x lv4: %d kdist_own:0x%x kdist_peer:0x%x\n",
+                          p_ble_evt->evt.gap_evt.params.auth_status.auth_status,
+                          p_ble_evt->evt.gap_evt.params.auth_status.bonded,
+                          p_ble_evt->evt.gap_evt.params.auth_status.sm1_levels.lv4,
+                          *((uint8_t *)&p_ble_evt->evt.gap_evt.params.auth_status.kdist_own),
+                          *((uint8_t *)&p_ble_evt->evt.gap_evt.params.auth_status.kdist_peer));
+            break;
+
+#endif  // PASSKEY_SERVICE_ENABLED
 
         default:
             // No implementation needed.
@@ -889,7 +1029,8 @@ static void peer_manager_init(void)
     sec_param.kdist_peer.enc = 1;
     sec_param.kdist_peer.id  = 1;
 
-    err_code = pm_sec_params_set(&sec_param);
+//    err_code = pm_sec_params_set(&sec_param);
+    err_code = pm_sec_params_set(NULL);
     APP_ERROR_CHECK(err_code);
 
     err_code = pm_register(pm_evt_handler);
@@ -962,8 +1103,8 @@ static void buttons_leds_init(bool * p_erase_bonds)
 	*p_erase_bonds = false;
 	return;
 #endif	
-#if MUSH_FEATURE_ENABLED(LSM6DS3)
-#if MUSH_FEATURE_ENABLED(LSM6DS3_WKUP)
+#if LSM6DS3_ENABLED
+#if LSM6DS3_WKUP_ENABLED
 	*p_erase_bonds = true;
 	return;
 #endif
@@ -997,7 +1138,7 @@ static void advertising_start(void * p_erase_bonds)
 
 
 #if NRF_LOG_ENABLED
-#if MUSH_FEATURE_ENABLED(LOG_TASK_NOTIFICATION)
+#if LOG_TASK_NOTIFICATION_ENABLED
 void nrf_log_notify(void) 
 {
 	if(m_logger_thread != NULL)
@@ -1005,7 +1146,7 @@ void nrf_log_notify(void)
 		xTaskNotifyGive(m_logger_thread);
 	}
 }
-#endif // MUSH_FEATURE_ENABLED(LOG_TASK_NOTIFICATION)
+#endif // LOG_TASK_NOTIFICATION_ENABLED
 
 /**@brief Thread for handling the logger.
  *
@@ -1021,9 +1162,9 @@ static void logger_thread(void * arg)
 
     while (1)
     {
- #if MUSH_FEATURE_ENABLED(LOG_TASK_NOTIFICATION)
+ #if LOG_TASK_NOTIFICATION_ENABLED
 //#warning "######### LOG Notify #########\n" 
-	(void) ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+//	(void) ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
         NRF_LOG_FLUSH();
 #else
        NRF_LOG_FLUSH();
@@ -1040,7 +1181,7 @@ static void logger_thread(void * arg)
 void vApplicationIdleHook( void )
 {
 #if NRF_LOG_ENABLED
-#if !MUSH_FEATURE_ENABLED(LOG_TASK_NOTIFICATION)
+#if !LOG_TASK_NOTIFICATION_ENABLED
      vTaskResume(m_logger_thread);
 #endif
 #endif
@@ -1055,15 +1196,15 @@ static void clock_init(void)
     APP_ERROR_CHECK(err_code);
 }
 
-#if MUSH_FEATURE_ENABLED(LSM6DS3)
-#if MUSH_FEATURE_ENABLED(LSM6DS3_WKUP)
+#if LSM6DS3_ENABLED
+#if LSM6DS3_WKUP_ENABLED
 
 static void in_pin_handler(nrfx_gpiote_pin_t pin, nrf_gpiote_polarity_t action)
 {
 //    nrfx_gpiote_out_toggle(DEBUG_LED_PIN);
 }
-#endif // MUSH_FEATURE_ENABLED(LSM6DS3_WKUP)
-#endif // MUSH_FEATURE_ENABLED(LSM6DS3)
+#endif // LSM6DS3_WKUP_ENABLED
+#endif // LSM6DS3_ENABLED
 
 /**
  * @brief Function for configuring: PIN_IN pin for input, PIN_OUT pin for output,
@@ -1080,18 +1221,20 @@ static void gpio_init(void)
 
 //    err_code = nrfx_gpiote_out_init(DEBUG_LED_PIN, &out_config);
 //    APP_ERROR_CHECK(err_code);
-#if MUSH_FEATURE_ENABLED(AD8237)
+#if AD8237_ENABLED
     err_code = nrfx_gpiote_out_init(ADC_POWER_PIN, &out_config);
     APP_ERROR_CHECK(err_code);
     err_code = nrfx_gpiote_out_init(ADC_VREF_PIN, &out_config);
+    APP_ERROR_CHECK(err_code);
+    err_code = nrfx_gpiote_out_init(PAIRING_LED_PIN, &out_config);
     APP_ERROR_CHECK(err_code);
 #ifdef DEBUG_SAADC_PIN
     err_code = nrfx_gpiote_out_init(DEBUG_SAADC_PIN, &out_config);
     APP_ERROR_CHECK(err_code);
 #endif // DEBUG_SAADC_PIN
-#endif // MUSH_FEATURE_ENABLED(AD8237)
-#if MUSH_FEATURE_ENABLED(LSM6DS3)
-#if MUSH_FEATURE_ENABLED(LSM6DS3_WKUP)
+#endif // AD8237_ENABLED
+#if LSM6DS3_ENABLED
+#if LSM6DS3_WKUP_ENABLED
 
     nrfx_gpiote_in_config_t in_config = NRFX_GPIOTE_CONFIG_IN_SENSE_LOTOHI(true);
     in_config.pull = NRF_GPIO_PIN_PULLUP;
@@ -1100,12 +1243,12 @@ static void gpio_init(void)
     APP_ERROR_CHECK(err_code);
 
 //    nrf_drv_gpiote_in_event_enable(LSM6DS3_INT1_PIN, true);
-#endif // MUSH_FEATURE_ENABLED(LSM6DS3_WKUP)
-#endif // MUSH_FEATURE_ENABLED(LSM6DS3)
+#endif // LSM6DS3_WKUP_ENABLED
+#endif // LSM6DS3_ENABLED
 }
 
 
-#if MUSH_FEATURE_ENABLED(AD8237)
+#if AD8237_ENABLED
 void timer4_handler(nrf_timer_event_t event_type, void * p_context)
 {
 }
@@ -1126,16 +1269,19 @@ static void saadc_ainX_init(void)
     err_code = nrf_drv_timer_init(&m_timer4, &timer_cfg, timer4_handler);
     APP_ERROR_CHECK(err_code);
 
-#if MUSH_FEATURE_ENABLED(APP_RINGBUFFER)
-      ticks = nrf_drv_timer_ms_to_ticks(&m_timer4, ADC_SAMPLING_TIME_IN_MSEC);   // 100ms sampling
-//	ticks = 20000;
-    
+#if APP_RINGBUFFER_ENABLED
+//      ticks = nrf_drv_timer_ms_to_ticks(&m_timer4, ADC_SAMPLING_TIME_IN_MSEC);   // 100ms sampling
+	ticks = 20000;  // 200Hz sampling
+
+// +[ADK] 2021-02-26 for debugging: 	
+//    ticks = nrf_drv_timer_ms_to_ticks(&m_timer4, 500 /*400 */);   // 2 per sec for debugging, need a configuration ..
 //    ticks = nrf_drv_timer_ms_to_ticks(&m_timer4, 1000 /*400 */);   // 1 sec for debugging, need a configuration ..
+// -[ADK]    
 #else
     /* setup m_timer4 cc0 for compare event every 1000/400ms */
     ticks = nrf_drv_timer_ms_to_ticks(&m_timer4, 1000 /*400 */);   // 1 sec for debugging, need a configuration ..
-#endif // MUSH_FEATURE_ENABLED(APP_RINGBUFFER)
-//NRF_LOG_RAW_INFO("\tTimer4=[%d] ticks\r\n", ticks);
+#endif // APP_RINGBUFFER_ENABLED
+NRF_LOG_RAW_INFO("\tTimer4=[%d] ticks\r\n", ticks);
     nrf_drv_timer_extended_compare(&m_timer4,
                                    NRF_TIMER_CC_CHANNEL0,
                                    ticks,
@@ -1160,15 +1306,15 @@ void saadc_event_ain_enable(void)
 {
     ret_code_t err_code;	
 
-#if MUSH_FEATURE_ENABLED(SAADC_DIFF_AIN13)
+#if SAADC_DIFF_AIN13_ENABLED
 #else
 #ifdef DEBUG_SAADC_PIN
 #else
     nrf_gpio_pin_set(ADC_POWER_PIN);
-//    nrf_gpio_pin_set(ADC_VREF_PIN);
+    nrf_gpio_pin_set(ADC_VREF_PIN);
 #endif // DEBUG_SAADC_PIN
 
-#endif // MUSH_FEATURE_ENABLED(SAADC_DIFF_AIN13)
+#endif // SAADC_DIFF_AIN13_ENABLED
     err_code = nrf_drv_ppi_channel_enable(m_ppi_channel);
 
     APP_ERROR_CHECK(err_code);
@@ -1180,232 +1326,79 @@ void saadc_ain_callback(nrf_drv_saadc_evt_t const * p_event)
     if (p_event->type == NRF_DRV_SAADC_EVT_DONE)
     {
         ret_code_t err_code;
-	 uint8_t idx, idy;	
-#if MUSH_FEATURE_ENABLED(SAADC_AIN0)
+        uint8_t idx, idy;	
+#if SAADC_AIN0_ENABLED
         uint32_t adc_value0 = 0;
-#endif //MUSH_FEATURE_ENABLED(SAADC_AIN0)
-#if MUSH_FEATURE_ENABLED(SAADC_AIN1)
+//	 float adc_volts0;	
+#endif //SAADC_AIN0_ENABLED
+#if SAADC_AIN1_ENABLED
         uint32_t adc_value1 = 0;
 //	 float adc_volts1;	
-#endif // MUSH_FEATURE_ENABLED(SAADC_AIN1)
-#if MUSH_FEATURE_ENABLED(SAADC_AIN2)
+#endif // SAADC_AIN1_ENABLED
+#if SAADC_AIN2_ENABLED
         uint32_t adc_value2 = 0;
-//	 float adc_volts3;	
-#endif // MUSH_FEATURE_ENABLED(SAADC_AIN2)
-#if MUSH_FEATURE_ENABLED(SAADC_AIN3)
+//	 float adc_volts2;	
+#endif // SAADC_AIN2_ENABLED
+#if SAADC_AIN3_ENABLED
         uint32_t adc_value3 = 0;
 //	 float adc_volts3;	
-#endif // MUSH_FEATURE_ENABLED(SAADC_AIN3)
-#if MUSH_FEATURE_ENABLED(SAADC_AIN4)
-        uint32_t adc_value4 = 0;
-//	 float adc_volts4;	
-#endif // MUSH_FEATURE_ENABLED(SAADC_AIN4)
-#if MUSH_FEATURE_ENABLED(SAADC_AIN5)
-        uint32_t adc_value5 = 0;
-//	 float adc_volts5;	
-#endif // MUSH_FEATURE_ENABLED(SAADC_AIN5)
-#if MUSH_FEATURE_ENABLED(SAADC_DIFF_AIN01)
-        uint32_t adc01_value = 0;
-#endif // MUSH_FEATURE_ENABLED(SAADC_DIFF_AIN01)
-#if MUSH_FEATURE_ENABLED(SAADC_DIFF_AIN23)
-        uint32_t adc23_value = 0;
-#if MUSH_FEATURE_ENABLED(APP_RINGBUFFER)
-#else
-	 float adc_volts;	
-#endif //MUSH_FEATURE_ENABLED(APP_RINGBUFFER)
-#endif //MUSH_FEATURE_ENABLED(SAADC_AIN23)
+#endif // SAADC_AIN3_ENABLED
 
         err_code = nrf_drv_saadc_buffer_convert(p_event->data.done.p_buffer, ADC_POOL_SIZE);
         APP_ERROR_CHECK(err_code);
-
-       // print samples on hardware UART and parse data for BLE transmission
-//        NRF_LOG_RAW_INFO("ADC event number: %d\r\n",(int)m_adc_evt_counter);
 	 idx = 0;
 	 idy = 0;
 	 while(idx < ADC_POOL_SIZE)
 	 {
 
-#if MUSH_FEATURE_ENABLED(SAADC_AIN0)
-//	     value_ain0[ idy] = p_event->data.done.p_buffer[idx];
-//            NRF_LOG_RAW_INFO("\tAIN0[%d]=[%d]0x%04x\r\n", idy, idx, p_event->data.done.p_buffer[idx]);
+#if SAADC_AIN0_ENABLED
 	     if ((p_event->data.done.p_buffer[idx] & (~0xFFF)) == 0) {
 		 	adc_value0 += (p_event->data.done.p_buffer[idx] & 0xFFF);
 	     }
 	     idx++;	
-#endif //MUSH_FEATURE_ENABLED(SAADC_AIN0)
-#if MUSH_FEATURE_ENABLED(SAADC_AIN1)
-//	     value_ain0[ idy] = p_event->data.done.p_buffer[idx];
-//            NRF_LOG_RAW_INFO("\tAIN1[%d]=[%d]0x%04x\r\n", idy, idx, p_event->data.done.p_buffer[idx]);
+#endif //SAADC_AIN0_ENABLED
+#if SAADC_AIN1_ENABLED
 	     if ((p_event->data.done.p_buffer[idx] & (~0xFFF)) == 0) {
 		 	adc_value1 += (p_event->data.done.p_buffer[idx] & 0xFFF);
 	     }
 	     idx++;	
-#endif //MUSH_FEATURE_ENABLED(SAADC_AIN1)
-#if MUSH_FEATURE_ENABLED(SAADC_AIN2)
-//	     value_ain2[ idy] = p_event->data.done.p_buffer[idx];
-//            NRF_LOG_RAW_INFO("\tAIN2[%d]=[%d]0x%04x\r\n", idy, idx, p_event->data.done.p_buffer[idx]);
+#endif //SAADC_AIN1_ENABLED
+#if SAADC_AIN2_ENABLED
 	     if ((p_event->data.done.p_buffer[idx] & (~0xFFF)) == 0) {
 		 	adc_value2 += (p_event->data.done.p_buffer[idx] & 0xFFF);
 	     }
 	     idx++;	
-#endif //MUSH_FEATURE_ENABLED(SAADC_AIN2)
-#if MUSH_FEATURE_ENABLED(SAADC_AIN3)
+#endif //SAADC_AIN2_ENABLED
+#if SAADC_AIN3_ENABLED
 //	     value_ain0[ idy] = p_event->data.done.p_buffer[idx];
 //            NRF_LOG_RAW_INFO("\tAIN3[%d]=[%d]0x%04x\r\n", idy, idx, p_event->data.done.p_buffer[idx]);
 	     if ((p_event->data.done.p_buffer[idx] & (~0xFFF)) == 0) {
 		 	adc_value3 += (p_event->data.done.p_buffer[idx] & 0xFFF);
 	     }
 	     idx++;	
-#endif //MUSH_FEATURE_ENABLED(SAADC_AIN3)
-#if MUSH_FEATURE_ENABLED(SAADC_AIN4)
-//	     value_ain0[ idy] = p_event->data.done.p_buffer[idx];
-//            NRF_LOG_RAW_INFO("\tAIN4[%d]=[%d]0x%04x\r\n", idy, idx, p_event->data.done.p_buffer[idx]);
-	     if ((p_event->data.done.p_buffer[idx] & (~0xFFF)) == 0) {
-		 	adc_value4 += (p_event->data.done.p_buffer[idx] & 0xFFF);
-	     }
-	     idx++;	
-#endif //MUSH_FEATURE_ENABLED(SAADC_AIN4)
-#if MUSH_FEATURE_ENABLED(SAADC_AIN5)
-//	     value_ain0[ idy] = p_event->data.done.p_buffer[idx];
-//            NRF_LOG_RAW_INFO("\tAIN5[%d]=[%d]0x%04x\r\n", idy, idx, p_event->data.done.p_buffer[idx]);
-	     if ((p_event->data.done.p_buffer[idx] & (~0xFFF)) == 0) {
-		 	adc_value5 += (p_event->data.done.p_buffer[idx] & 0xFFF);
-	     }
-	     idx++;	
-#endif //MUSH_FEATURE_ENABLED(SAADC_AIN5)
-#if MUSH_FEATURE_ENABLED(SAADC_DIFF_AIN13)
-//            NRF_LOG_RAW_INFO("\tAIN13[%d]=0x%04x\r\n", idx, p_event->data.done.p_buffer[idx]);
-	     if ((p_event->data.done.p_buffer[idx] & (~0xFFF)) == 0) {
-		 	adc_value += (p_event->data.done.p_buffer[idx] & 0xFFF);
-	     }
-//		 else
-//		 	adc_value += ((~p_event->data.done.p_buffer[idx]) & 0xFFF);
-		 
-	     idx++;	
-#endif //MUSH_FEATURE_ENABLED(SAADC_DIFF_AIN13)
-#if MUSH_FEATURE_ENABLED(SAADC_DIFF_AIN01)
-//            NRF_LOG_RAW_INFO("\tAIN: 01[%d]=0x%04x, 23[%d]=0x%04x\r\n", idx, p_event->data.done.p_buffer[idx], idx+1, p_event->data.done.p_buffer[idx +1]);
-//            NRF_LOG_RAW_INFO("\tAIN01[%d]=0x%04x\r\n", idx, p_event->data.done.p_buffer[idx]);
-	     if (((p_event->data.done.p_buffer[idx] & (~0x07FF)) == 0)  && ((p_event->data.done.p_buffer[idx] & 0x7FF) != 0x7FF)) {
-		 	adc01_value += (p_event->data.done.p_buffer[idx] & 0x07FF);
-	     }
-		 
-	     idx++;	
-#endif //MUSH_FEATURE_ENABLED(SAADC_DIFF_AIN01)
-#if MUSH_FEATURE_ENABLED(SAADC_DIFF_AIN23)
-//            NRF_LOG_RAW_INFO("\tAIN23[%d]=0x%04x\r\n", idx, p_event->data.done.p_buffer[idx]);
-	     if (((p_event->data.done.p_buffer[idx] & (~0x07FF)) == 0) && ((p_event->data.done.p_buffer[idx] & 0x7FF) != 0x7FF)) {
-		 	adc23_value += (p_event->data.done.p_buffer[idx] & 0x07FF);
-	     }
-		 
-	     idx++;	
-#endif //MUSH_FEATURE_ENABLED(SAADC_DIFF_AIN23)
-
+#endif //SAADC_AIN3_ENABLED
 	    idy++; 	
 	 }
 
-#ifdef DEBUG_SAADC_PIN
-	nrf_gpio_pin_toggle(DEBUG_SAADC_PIN);
-#if MUSH_FEATURE_ENABLED(SAADC_AIN5)
-	if (samples_rb_free_size((void *)&rb_cntrl))
-		samples_rb_write((void *)&rb_cntrl, adc_value4/ADC_SAMPLES_IN_BUFFER, adc_value5/ADC_SAMPLES_IN_BUFFER);
-#endif //MUSH_FEATURE_ENABLED(SAADC_AIN5)
-#if MUSH_FEATURE_ENABLED(SAADC_AIN1)
-	if (samples_rb_free_size((void *)&rb_cntrl))
-		samples_rb_write((void *)&rb_cntrl, adc_value1/ADC_SAMPLES_IN_BUFFER, adc_value3/ADC_SAMPLES_IN_BUFFER);
-#endif //MUSH_FEATURE_ENABLED(SAADC_AIN5)
-	
-#else  // DEBUG_SAADC_PIN	
-//	NRF_LOG_RAW_INFO("adc_value=%d\r\n", adc_value);
-#if MUSH_FEATURE_ENABLED(SAADC_DIFF_AIN13)
-	 adc_value13/=ADC_SAMPLES_IN_BUFFER;
-	 adc_volts =(adc_value13/2048.0)*0.6; 
-      	NRF_LOG_RAW_INFO("\tadc="MUSHIN_LOG_FLOAT_MARKER"V\r\n", MUSHIN_LOG_FLOAT(adc_volts));
-#else
-#if 0
-#if MUSH_FEATURE_ENABLED(SAADC_AIN0)
+/*  
 	 adc_value0/=ADC_SAMPLES_IN_BUFFER;
-	 adc_volts =(adc_value0/4096.0)*3.6; 
-	 adc_volts /= 151.0;
-      	NRF_LOG_RAW_INFO("\tadc="MUSHIN_LOG_FLOAT_MARKER"V\r\n", MUSHIN_LOG_FLOAT(adc_volts));
-#endif //MUSH_FEATURE_ENABLED(SAADC_AIN0)
-#if MUSH_FEATURE_ENABLED(SAADC_AIN1)
+	 adc_volts0 =(adc_value0/4096.0)*3.6; 
 	 adc_value1/=ADC_SAMPLES_IN_BUFFER;
 	 adc_volts1 =(adc_value1/4096.0)*3.6; 
-#if MUSH_FEATURE_ENABLED(SAADC_AIN3)
-      	NRF_LOG_RAW_INFO("\tadc1="MUSHIN_LOG_FLOAT_MARKER"V, ", MUSHIN_LOG_FLOAT(adc_volts1));
-#else
-      	NRF_LOG_RAW_INFO("\tadc1="MUSHIN_LOG_FLOAT_MARKER"V\r\n", MUSHIN_LOG_FLOAT(adc_volts1));
-#endif // MUSH_FEATURE_ENABLED(SAADC_AIN3)
-#endif //MUSH_FEATURE_ENABLED(SAADC_AIN1)
-#if MUSH_FEATURE_ENABLED(SAADC_AIN3)
-	 adc_value3/=ADC_SAMPLES_IN_BUFFER;
-	 adc_volts3 =(adc_value3/4096.0)*3.6; 
-      	NRF_LOG_RAW_INFO("adc3="MUSHIN_LOG_FLOAT_MARKER"V", MUSHIN_LOG_FLOAT(adc_volts3));
-      	NRF_LOG_RAW_INFO("\tsig="MUSHIN_LOG_FLOAT_MARKER"V\r\n", MUSHIN_LOG_FLOAT((adc_volts3 - adc_volts1)));
-#endif //MUSH_FEATURE_ENABLED(SAADC_AIN3)
-#endif // 0
-#if MUSH_FEATURE_ENABLED(APP_RINGBUFFER)
-	if (samples_rb_free_size((void *)&rb_cntrl))
+	 adc_value2/=ADC_SAMPLES_IN_BUFFER;
+	 adc_volts2 =(adc_value1/4096.0)*3.6; 
+      	NRF_LOG_RAW_INFO("\tAIN0="MUSHIN_LOG_FLOAT_MARKER"V, ", MUSHIN_LOG_FLOAT(adc_volts0));
+      	NRF_LOG_RAW_INFO(" AIN2="MUSHIN_LOG_FLOAT_MARKER"V, ", MUSHIN_LOG_FLOAT(adc_volts2));
+      	NRF_LOG_RAW_INFO(" Vref="MUSHIN_LOG_FLOAT_MARKER"V\r\n", MUSHIN_LOG_FLOAT(adc_volts1));
+*/      	
+      	
+	if (samples_rb_free_size((void *)&rb_cntrl)) {
 		samples_rb_write((void *)&rb_cntrl, adc_value0/ADC_SAMPLES_IN_BUFFER, adc_value1/ADC_SAMPLES_IN_BUFFER,
-			adc_value2/ADC_SAMPLES_IN_BUFFER, adc_value3/ADC_SAMPLES_IN_BUFFER
+			adc_value2/ADC_SAMPLES_IN_BUFFER, 0
 		);
-#endif //MUSH_FEATURE_ENABLED(APP_RINGBUFFER)
-#endif //MUSH_FEATURE_ENABLED(SAADC_DIFF_AIN13)
-#if MUSH_FEATURE_ENABLED(SAADC_DIFF_AIN23)
-#if MUSH_FEATURE_ENABLED(APP_RINGBUFFER)
-	if (samples_rb_free_size((void *)&rb_cntrl))
-#if MUSH_FEATURE_ENABLED(SAADC_DIFF_AIN01)
-		samples_rb_write((void *)&rb_cntrl, adc01_value/ADC_SAMPLES_IN_BUFFER, adc23_value/ADC_SAMPLES_IN_BUFFER);
-#else
-		samples_rb_write((void *)&rb_cntrl, adc23_value/ADC_SAMPLES_IN_BUFFER, 0/*adc_value5/ADC_SAMPLES_IN_BUFFER */);
-#endif //MUSH_FEATURE_ENABLED(SAADC_DIFF_AIN01)
-#else //MUSH_FEATURE_ENABLED(APP_RINGBUFFER)
-	 adc23_value/=ADC_SAMPLES_IN_BUFFER;
-	 adc_volts =(adc23_value/2048.0)*1.8; 
-      	NRF_LOG_RAW_INFO("\tdiff23="MUSHIN_LOG_FLOAT_MARKER"V\r\n", MUSHIN_LOG_FLOAT(adc_volts));
-#endif //MUSH_FEATURE_ENABLED(APP_RINGBUFFER)
-#else // MUSH_FEATURE_ENABLED(SAADC_DIFF_AIN23)
-#if MUSH_FEATURE_ENABLED(SAADC_DIFF_AIN01)
-#if MUSH_FEATURE_ENABLED(APP_RINGBUFFER)
-	if (samples_rb_free_size((void *)&rb_cntrl))
-		samples_rb_write((void *)&rb_cntrl, adc01_value/ADC_SAMPLES_IN_BUFFER, 0);
-#else //MUSH_FEATURE_ENABLED(APP_RINGBUFFER)
-	 adc01_value/=ADC_SAMPLES_IN_BUFFER;
-	 adc_volts =(adc01_value/2048.0)*1.8; 
-      	NRF_LOG_RAW_INFO("\tdiff01="MUSHIN_LOG_FLOAT_MARKER"V\r\n", MUSHIN_LOG_FLOAT(adc_volts));
-#endif //MUSH_FEATURE_ENABLED(APP_RINGBUFFER)
-#endif //MUSH_FEATURE_ENABLED(SAADC_DIFF_AIN01)
-#endif // MUSH_FEATURE_ENABLED(SAADC_DIFF_AIN23)
-
-#if MUSH_FEATURE_ENABLED(SAADC_AIN4)
-	 adc_value4/=ADC_SAMPLES_IN_BUFFER;
-	 adc_volts4 =(adc_value4/4096.0)*3.6; 
-#if MUSH_FEATURE_ENABLED(SAADC_AIN5)
-      	NRF_LOG_RAW_INFO("\tadc4="MUSHIN_LOG_FLOAT_MARKER"V, ", MUSHIN_LOG_FLOAT(adc_volts4));
-#else
-      	NRF_LOG_RAW_INFO("\tadc4="MUSHIN_LOG_FLOAT_MARKER"V\r\n", MUSHIN_LOG_FLOAT(adc_volts4));
-#endif // MUSH_FEATURE_ENABLED(SAADC_AIN5)
-#endif //MUSH_FEATURE_ENABLED(SAADC_AIN4)
-#if MUSH_FEATURE_ENABLED(SAADC_AIN5)
-	 adc_value5/=ADC_SAMPLES_IN_BUFFER;
-	 adc_volts5 =(adc_value5/4096.0)*3.6; 
-      	NRF_LOG_RAW_INFO("adc5="MUSHIN_LOG_FLOAT_MARKER"V", MUSHIN_LOG_FLOAT(adc_volts5));
-      	NRF_LOG_RAW_INFO("\tsig="MUSHIN_LOG_FLOAT_MARKER"V\r\n", MUSHIN_LOG_FLOAT((adc_volts5 - adc_volts4)));
-#endif //MUSH_FEATURE_ENABLED(SAADC_AIN5)
-#endif // DEBUG_SAADC_PIN
-
-//	NRF_LOG_RAW_INFO("int val=%05d\r\n", (int32_t)((adc_volts)*100000.0));
-
-
-/*
-        for (idx =0; ; idx++)
-        {
-            adc_value = p_event->data.done.p_buffer[i];
-            value[i*2] = adc_value;
-            value[(i*2)+1] = adc_value >> 8;
+		
         }
-*/            
+        
         m_adc_evt_counter++;
     }
 }
@@ -1418,116 +1411,64 @@ void saadc_init(void)
     nrf_drv_saadc_config_t saadc_config = NRF_DRV_SAADC_DEFAULT_CONFIG;
     saadc_config.resolution = NRF_SAADC_RESOLUTION_12BIT;
 	
-#if MUSH_FEATURE_ENABLED(SAADC_AIN0)
+#if SAADC_AIN0_ENABLED
     nrf_saadc_channel_config_t channel_config_ain0 =
         NRF_DRV_SAADC_DEFAULT_CHANNEL_CONFIG_SE(NRF_SAADC_INPUT_AIN0);
         channel_config_ain0.gain = NRF_SAADC_GAIN1_6;
+        channel_config_ain0.acq_time = NRF_SAADC_ACQTIME_3US;
 //    channel_config_ain0.reference = NRF_SAADC_REFERENCE_VDD4;
 #else
     nrf_gpio_cfg_input(2, NRF_GPIO_PIN_NOPULL);
-#endif // MUSH_FEATURE_ENABLED(SAADC_AIN0)
+#endif // SAADC_AIN0_ENABLED
 
-#if MUSH_FEATURE_ENABLED(SAADC_AIN1)
+#if SAADC_AIN1_ENABLED
     nrf_saadc_channel_config_t channel_config_ain1 =
         NRF_DRV_SAADC_DEFAULT_CHANNEL_CONFIG_SE(NRF_SAADC_INPUT_AIN1);
     	channel_config_ain1.gain = NRF_SAADC_GAIN1_6;
+        channel_config_ain1.acq_time = NRF_SAADC_ACQTIME_3US;
 //    channel_config_ain0.reference = NRF_SAADC_REFERENCE_VDD4;
-#endif // MUSH_FEATURE_ENABLED(SAADC_AIN1)
+#endif // SAADC_AIN1_ENABLED
 
-#if MUSH_FEATURE_ENABLED(SAADC_AIN2)
+#if SAADC_AIN2_ENABLED
     nrf_saadc_channel_config_t channel_config_ain2 =
         NRF_DRV_SAADC_DEFAULT_CHANNEL_CONFIG_SE(NRF_SAADC_INPUT_AIN2);
         channel_config_ain2.gain = NRF_SAADC_GAIN1_6;
+        channel_config_ain2.acq_time = NRF_SAADC_ACQTIME_3US;
 //    channel_config_ain2.reference = NRF_SAADC_REFERENCE_VDD4;
-#endif // MUSH_FEATURE_ENABLED(SAADC_AIN2)
-#if MUSH_FEATURE_ENABLED(SAADC_AIN3)
+#endif // SAADC_AIN2_ENABLED
+#if SAADC_AIN3_ENABLED
     nrf_saadc_channel_config_t channel_config_ain3 =
         NRF_DRV_SAADC_DEFAULT_CHANNEL_CONFIG_SE(NRF_SAADC_INPUT_AIN3);
     	channel_config_ain3.gain = NRF_SAADC_GAIN1_6;
+        channel_config_ain3.acq_time = NRF_SAADC_ACQTIME_3US;
 //    channel_config_ain0.reference = NRF_SAADC_REFERENCE_VDD4;
-#endif // MUSH_FEATURE_ENABLED(SAADC_AIN3)
-#if MUSH_FEATURE_ENABLED(SAADC_AIN4)
-    nrf_saadc_channel_config_t channel_config_ain4 =
-        NRF_DRV_SAADC_DEFAULT_CHANNEL_CONFIG_SE(NRF_SAADC_INPUT_AIN4);
-    	channel_config_ain4.gain = NRF_SAADC_GAIN1_2;
-//    channel_config_ain2.reference = NRF_SAADC_REFERENCE_VDD4;
-#endif // MUSH_FEATURE_ENABLED(SAADC_AIN4)
-#if MUSH_FEATURE_ENABLED(SAADC_AIN5)
-    nrf_saadc_channel_config_t channel_config_ain5 =
-        NRF_DRV_SAADC_DEFAULT_CHANNEL_CONFIG_SE(NRF_SAADC_INPUT_AIN5);
-    	channel_config_ain5.gain = NRF_SAADC_GAIN1_2;
-//    channel_config_ain0.gain = NRF_SAADC_GAIN1_4;
-//    channel_config_ain0.reference = NRF_SAADC_REFERENCE_VDD4;
-#endif // MUSH_FEATURE_ENABLED(SAADC_AIN5)
-
-#if MUSH_FEATURE_ENABLED(SAADC_DIFF_AIN13)
-    nrf_saadc_channel_config_t channel_config_ain13 =
-        NRF_DRV_SAADC_DEFAULT_CHANNEL_CONFIG_DIFFERENTIAL(NRF_SAADC_INPUT_AIN1, NRF_SAADC_INPUT_AIN3);
-    channel_config_ain13.gain = NRF_SAADC_GAIN1;
-#endif // MUSH_FEATURE_ENABLED(SAADC_DIFF_AIN13)
-#if MUSH_FEATURE_ENABLED(SAADC_DIFF_AIN01)
-    nrf_saadc_channel_config_t channel_config_ain01 =
-        NRF_DRV_SAADC_DEFAULT_CHANNEL_CONFIG_DIFFERENTIAL(NRF_SAADC_INPUT_AIN0, NRF_SAADC_INPUT_AIN1);
-    channel_config_ain01.gain = NRF_SAADC_GAIN1_3;
-#endif // MUSH_FEATURE_ENABLED(SAADC_DIFF_AIN23)
-#if MUSH_FEATURE_ENABLED(SAADC_DIFF_AIN23)
-    nrf_saadc_channel_config_t channel_config_ain23 =
-        NRF_DRV_SAADC_DEFAULT_CHANNEL_CONFIG_DIFFERENTIAL(NRF_SAADC_INPUT_AIN3, NRF_SAADC_INPUT_AIN2);
-    channel_config_ain23.gain = NRF_SAADC_GAIN1_3;
-#endif // MUSH_FEATURE_ENABLED(SAADC_DIFF_AIN23)
-
+#endif // SAADC_AIN3_ENABLED
 
     err_code = nrf_drv_saadc_init(&saadc_config, saadc_ain_callback);
     APP_ERROR_CHECK(err_code);
 
-#if MUSH_FEATURE_ENABLED(SAADC_AIN0)
+#if SAADC_AIN0_ENABLED
     err_code = nrf_drv_saadc_channel_init(channel, &channel_config_ain0);
     APP_ERROR_CHECK(err_code);
     channel++;	
-#endif // MUSH_FEATURE_ENABLED(SAADC_AIN0)
+#endif // SAADC_AIN0_ENABLED
 
-#if MUSH_FEATURE_ENABLED(SAADC_AIN1)
+#if SAADC_AIN1_ENABLED
     err_code = nrf_drv_saadc_channel_init(channel, &channel_config_ain1);
     APP_ERROR_CHECK(err_code);
     channel++;	
-#endif // MUSH_FEATURE_ENABLED(SAADC_AIN0)
+#endif // SAADC_AIN0_ENABLED
 
-#if MUSH_FEATURE_ENABLED(SAADC_AIN2)
+#if SAADC_AIN2_ENABLED
     err_code = nrf_drv_saadc_channel_init(channel, &channel_config_ain2);
     APP_ERROR_CHECK(err_code);
     channel++;	
-#endif // MUSH_FEATURE_ENABLED(SAADC_AIN2)
-#if MUSH_FEATURE_ENABLED(SAADC_AIN3)
+#endif // SAADC_AIN2_ENABLED
+#if SAADC_AIN3_ENABLED
     err_code = nrf_drv_saadc_channel_init(channel, &channel_config_ain3);
     APP_ERROR_CHECK(err_code);
     channel++;	
-#endif // MUSH_FEATURE_ENABLED(SAADC_AIN0)
-#if MUSH_FEATURE_ENABLED(SAADC_AIN4)
-    err_code = nrf_drv_saadc_channel_init(channel, &channel_config_ain4);
-    APP_ERROR_CHECK(err_code);
-    channel++;	
-#endif // MUSH_FEATURE_ENABLED(SAADC_AIN4)
-#if MUSH_FEATURE_ENABLED(SAADC_AIN5)
-    err_code = nrf_drv_saadc_channel_init(channel, &channel_config_ain5);
-    APP_ERROR_CHECK(err_code);
-    channel++;	
-#endif // MUSH_FEATURE_ENABLED(SAADC_AIN5)
-
-#if MUSH_FEATURE_ENABLED(SAADC_DIFF_AIN13)
-    err_code = nrf_drv_saadc_channel_init(channel, &channel_config_ain13);
-    APP_ERROR_CHECK(err_code);
-    channel++;	
-#endif // MUSH_FEATURE_ENABLED(SAADC_DIFF_AIN13)
-#if MUSH_FEATURE_ENABLED(SAADC_DIFF_AIN23)
-    err_code = nrf_drv_saadc_channel_init(channel, &channel_config_ain23);
-    APP_ERROR_CHECK(err_code);
-    channel++;	
-#endif // MUSH_FEATURE_ENABLED(SAADC_DIFF_AIN23)
-#if MUSH_FEATURE_ENABLED(SAADC_DIFF_AIN01)
-    err_code = nrf_drv_saadc_channel_init(channel, &channel_config_ain01);
-    APP_ERROR_CHECK(err_code);
-    channel++;	
-#endif // MUSH_FEATURE_ENABLED(SAADC_DIFF_AIN01)
+#endif // SAADC_AIN3_ENABLED
 
     err_code = nrf_drv_saadc_buffer_convert(m_buffer_ain_pool[0], ADC_SAMPLES_IN_BUFFER);
     APP_ERROR_CHECK(err_code);
@@ -1540,14 +1481,14 @@ void saadc_init(void)
 
 }
 
-#endif // MUSH_FEATURE_ENABLED(AD8237)
+#endif // AD8237_ENABLED
 
 
 
 /**@brief Function for application main entry.
  */
 int main(void)
-{
+  {
     bool erase_bonds;
 
     // Initialize modules.
@@ -1568,19 +1509,18 @@ int main(void)
     // Activate deep sleep mode.
     SCB->SCR |= SCB_SCR_SLEEPDEEP_Msk;
 	
-	NRF_LOG_RAW_INFO("\r\n**** muShin Sensor Version 1.2 **\n");
-
-	NRF_LOG_RAW_INFO("Print/Send Delay = %d Hz\n", 1000/PRINT_SEND_DELAY_IN_MSEC);
-	NRF_LOG_RAW_INFO("Tick Timer Frequency = %d Hz\n", 1000 /APP_TICK_INTERVAL);
-	NRF_LOG_RAW_INFO("Data Acquisition Frequency = %d Hz\n", 1000 /ADC_SAMPLING_TIME_IN_MSEC);
-	NRF_LOG_FLUSH();
-
+	NRF_LOG_RAW_INFO("\r\n**** muShin Sensor Version 1.3 **\r\n");
+ 
     // Configure and initialize the BLE stack.
     ble_stack_init();
 
     // Initialize modules.
     timers_init();
     buttons_leds_init(&erase_bonds);
+#if  PASSKEY_SERVICE_ENABLED
+	ble_set_passkey(); 
+	sec_params_init();
+#endif // PASSKEY_SERVICE_ENABLED
     gpio_init();
     gap_params_init();
     gatt_init();
@@ -1590,21 +1530,27 @@ int main(void)
     peer_manager_init();
     application_timers_start();
 
-#if MUSH_FEATURE_ENABLED(AD8237)
+
+#if AD8237_ENABLED
     saadc_ainX_init();
     saadc_init();
-#if MUSH_FEATURE_ENABLED(APP_RINGBUFFER)
+#if APP_RINGBUFFER_ENABLED
     samples_rb_init(&rb_cntrl);	
-#endif // MUSH_FEATURE_ENABLED(APP_RINGBUFFER)
+#endif // APP_RINGBUFFER_ENABLED
     saadc_event_ain_enable();
-#endif // MUSH_FEATURE_ENABLED(AD8237)
+#endif // AD8237_ENABLED
 
 	///////////////////////////////////////////////////////////////////////////////////////////////
 	// Create application tasks. 
 	///////////////////////////////////////////////////////////////////////////////////////////////
 
-#if MUSH_FEATURE_ENABLED(TWI0) /* || NRF_MODULE_ENABLED(TWI1) */
-#if	MUSH_FEATURE_ENABLED(MEMORY_DEBUG)
+#if	MEMORY_DEBUG_ENABLED
+bool mush_memory_debug_flag = true;
+int mush_task_start_idx=0;
+#endif //MEMORY_DEBUG_ENABLED
+
+#if TWI0_ENABLED /* || NRF_MODULE_ENABLED(TWI1) */
+#if	MEMORY_DEBUG_ENABLED
 	if (mush_memory_debug_flag) {
 		NRF_LOG_RAW_INFO("#%d  ==== TWI0 =====\r\n", mush_task_start_idx);
 		mush_task_start_idx++;
@@ -1612,36 +1558,36 @@ int main(void)
 #endif // MEMORY_DEBUG
 	vTWI0_MasterStart(TWI0_STACKSIZE, 	TWI0_PRIORITY); 
 #endif
-#if MUSH_FEATURE_ENABLED(APP)
-#if	MUSH_FEATURE_ENABLED(MEMORY_DEBUG)
+#if APP_ENABLED
+#if	MEMORY_DEBUG_ENABLED
 	if (mush_memory_debug_flag) {
 		NRF_LOG_RAW_INFO("#%d:  ==== APP =====\r\n", mush_task_start_idx);
         	NRF_LOG_FLUSH();
 		mush_task_start_idx++;
 	}
 #endif // MEMORY_DEBUG
-#if MUSH_FEATURE_ENABLED(FREERTOS_TASK_STATS)
+#if FREERTOS_TASK_STATS_ENABLED
 // FreeRTOS tasks stats required a big size for stack.
 	vAppStart((APP_STACKSIZE *8), APP_PRIORITY);
 #else
 	vAppStart((APP_STACKSIZE*4), APP_PRIORITY);
-#endif // MUSH_FEATURE_ENABLED(FREERTOS_TASK_STATS)
+#endif // FREERTOS_TASK_STATS_ENABLED
 
 #endif
-#if MUSH_FEATURE_ENABLED(APP_RINGBUFFER)
-#if	MUSH_FEATURE_ENABLED(MEMORY_DEBUG)
+#if APP_RINGBUFFER_ENABLED
+#if	MEMORY_DEBUG_ENABLED
 	if (mush_memory_debug_flag) {
 		NRF_LOG_RAW_INFO("#%d:  ==== Samples =====\r\n", mush_task_start_idx);
         	NRF_LOG_FLUSH();
 		mush_task_start_idx++;
 	}
 #endif // MEMORY_DEBUG
-	vSamplesStart((APP_STACKSIZE *4), APP_PRIORITY);
-#endif //MUSH_FEATURE_ENABLED(APP_RINGBUFFER)
+	vSamplesStart((APP_STACKSIZE *6), APP_PRIORITY);
+#endif //APP_RINGBUFFER_ENABLED
 	
 
-#if MUSH_FEATURE_ENABLED(LSM6DS3)
-#if	MUSH_FEATURE_ENABLED(MEMORY_DEBUG)
+#if LSM6DS3_ENABLED
+#if	MEMORY_DEBUG_ENABLED
 	if (mush_memory_debug_flag) {
 		NRF_LOG_RAW_INFO("#%d:  ==== LSM6DS3 =====\r\n", mush_task_start_idx);
         	NRF_LOG_FLUSH();
@@ -1649,7 +1595,7 @@ int main(void)
 	}
 #endif // MEMORY_DEBUG
 	vLSM6DS3Start((LSM6DS3_STACKSIZE), LSM6DS3_PRIORITY);
-#endif //MUSH_FEATURE_ENABLED(LSM6DS3)
+#endif //LSM6DS3_ENABLED
 
 #ifdef DO_OUTTASK
 	vOutStart((APP_STACKSIZE *4), APP_PRIORITY);
@@ -1659,8 +1605,9 @@ int main(void)
     // The task will run advertising_start() before entering its loop.
     nrf_sdh_freertos_init(advertising_start, &erase_bonds);
 
-    NRF_LOG_RAW_INFO("muShin: FreeRTOS started SDK 17\r\n");
+    NRF_LOG_RAW_INFO("muShin: FreeRTOS started SDK 15.3.0\r\n");
     // Start FreeRTOS scheduler.
+    NRF_LOG_FLUSH();
     vTaskStartScheduler();
 
     for (;;)

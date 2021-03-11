@@ -45,7 +45,7 @@
 #include "i2c.h"
 #include "app.h"
 
-#if MUSH_FEATURE_ENABLED(TWI0)
+#if TWI0_ENABLED
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 //  Defines                                                                                                                                               //
@@ -104,7 +104,7 @@ void vTWI0_MasterStart( uint16_t usStackSize, portBASE_TYPE uxPriority)
 		.sda = 				_TWI0_PIN_SDA
 	};
 
-#if MUSH_FEATURE_ENABLED(TASK_START_DEBUG)
+#if TASK_START_DEBUG_ENABLED
 	NRF_LOG_RAW_INFO("%s()  Started\r\n", (uint32_t)__func__);
 #endif
 
@@ -194,25 +194,25 @@ static void prvTWI0_MasterTask( void *pvParameters )
 
 	( void ) pvParameters;
 	
-#if MUSH_FEATURE_ENABLED(TASK_START_DEBUG)
+#if TASK_START_DEBUG_ENABLED
 	NRF_LOG_RAW_INFO("%s Started ..\r\n", (uint32_t)__func__);
 #endif
 		master_pTWI0_Msg = &_TwiMsg;
 
-#if MUSH_FEATURE_ENABLED(APP)
+#if APP_ENABLED
 	if (!Wait4ReleaseDependedTask(&m_app_task))
 		NRF_LOG_RAW_INFO("%s : m_app_task not started\r\n", (uint32_t)__func__);	
-#endif // MUSH_FEATURE_ENABLED(APP)
+#endif // APP_ENABLED
 
 #if 0
-// #if MUSH_FEATURE_ENABLED(LSM6DS3)
+// #if LSM6DS3_ENABLED
 NRF_LOG_RAW_INFO("%s lsm6ds@0x%x\r\n", (uint32_t)__func__, (uint32_t)m_lsm6ds3_task);
 	if (!Wait4ReleaseDependedTask(&m_lsm6ds3_task)) {
 		NRF_LOG_RAW_INFO("%s : m_lsm6ds3_task not started\r\n", (uint32_t)__func__);	
 	}
 #endif
 
-#if MUSH_FEATURE_ENABLED(TASK_START_DEBUG)
+#if TASK_START_DEBUG_ENABLED
 	NRF_LOG_RAW_INFO("%s All depended tasks released\r\n", (uint32_t)__func__);
 #endif
 	bI2C_Task_Started = true;
@@ -583,5 +583,5 @@ void TWI0_TxRx(uint8_t Address, uint8_t *txdata, uint8_t txlength, uint8_t *rxda
 	}
 }
 
-#endif // MUSH_FEATURE_ENABLED(TWI0)
+#endif // TWI0_ENABLED
 	

@@ -72,6 +72,12 @@ void cmd_parser(void)
 	{
 		uiGlobalSysFlags = 0;
 		uiGlobalSysFlags = GLOBAL_START_FLAG;
+#ifdef DO_OUTTASK
+		if (m_out_task != NULL) {
+			xTaskNotifyGive(m_out_task);
+			NRF_LOG_RAW_INFO("!");
+			}
+#endif // DO_OUTTASK
 	}
 	else
 	if (!strncmp((char *)cmd_line, "STOP", 4))
@@ -101,5 +107,101 @@ void cmd_parser(void)
 	if (!strncmp((char *)cmd_line, "CRANK_RIGHT_OFF", 15))
 	{
 		uiCrankOutControl &=(~CRANK_RIGHT_OUT_FLAG);
+	}else
+	if (!strncmp((char *)cmd_line, "CRANK_RAW_TRSH", 14))
+	{
+//		char str_value[32];
+		CrankDataRawThreshold = strtof((char *)&cmd_line[14], NULL);
+/* [ADK] Debugging for convert str-to-float ..
+		sprintf(str_value, MUSHIN_LOG_FLOAT_MARKER, MUSHIN_SPRINTF_FLOAT(CrankDataRawThreshold));
+		NRF_LOG_RAW_INFO("CrankDataRawThreshold=[%s]\n", (uint32_t *)str_value);
+*/
+		
+	}else
+	if (!strncmp((char *)cmd_line, "CRANK_DIGFI_TRSH", 16))
+	{
+		CrankDataFilteredThreshold = strtof((char *)&cmd_line[16], NULL);
+		
+	}else
+	if (!strncmp((char *)cmd_line, "DIGFI_CRANK_ON", 14))
+	{
+		uiCrankOutControl |=CRANK_DIGIFI_FLAG;
+	}
+	else
+	if (!strncmp((char *)cmd_line, "DIGFI_CRANK_OFF", 15))
+	{
+		uiCrankOutControl &=(~CRANK_DIGIFI_FLAG);
+	}else
+///////////////////////////////////////////////////////////////////////////////////////////////
+// XL  Control 
+///////////////////////////////////////////////////////////////////////////////////////////////
+	if (!strncmp((char *)cmd_line, "ACC_X_ON", 8))
+	{
+		uiXLGYOutControl |=ACC_X_OUT_FLAG;
+		bXLGY_Reader_Ready = true;
+		bXL_Data_Ready = false;
+	}else
+	if (!strncmp((char *)cmd_line, "ACC_X_OFF", 9))
+	{
+		uiXLGYOutControl &=(~ACC_X_OUT_FLAG);
+		bXL_Data_Ready = false;
+	}else
+	if (!strncmp((char *)cmd_line, "ACC_Y_ON", 8))
+	{
+		uiXLGYOutControl |=ACC_Y_OUT_FLAG;
+		bXLGY_Reader_Ready = true;
+		bXL_Data_Ready = false;
+	}else
+	if (!strncmp((char *)cmd_line, "ACC_Y_OFF", 9))
+	{
+		uiXLGYOutControl &=(~ACC_Y_OUT_FLAG);
+		bXL_Data_Ready = false;
+	}else
+	if (!strncmp((char *)cmd_line, "ACC_Z_ON", 8))
+	{
+		uiXLGYOutControl |=ACC_Z_OUT_FLAG;
+		bXLGY_Reader_Ready = true;
+		bXL_Data_Ready = false;
+	}else
+	if (!strncmp((char *)cmd_line, "ACC_Z_OFF", 9))
+	{
+		uiXLGYOutControl &=(~ACC_Z_OUT_FLAG);
+		bXL_Data_Ready = false;
+	}else
+///////////////////////////////////////////////////////////////////////////////////////////////
+// Gyro  Control 
+///////////////////////////////////////////////////////////////////////////////////////////////
+	if (!strncmp((char *)cmd_line, "GYRO_X_ON", 9))
+	{
+		uiXLGYOutControl |=GY_X_OUT_FLAG;
+		bXLGY_Reader_Ready = true;
+		bGY_Data_Ready = false;
+	}else
+	if (!strncmp((char *)cmd_line, "GYRO_X_OFF", 10))
+	{
+		uiXLGYOutControl &=(~GY_X_OUT_FLAG);
+		bGY_Data_Ready = false;
+	}else
+	if (!strncmp((char *)cmd_line, "GYRO_Y_ON", 9))
+	{
+		uiXLGYOutControl |=GY_Y_OUT_FLAG;
+		bXLGY_Reader_Ready = true;
+		bGY_Data_Ready = false;
+	}else
+	if (!strncmp((char *)cmd_line, "GYRO_Y_OFF", 10))
+	{
+		uiXLGYOutControl &=(~GY_Y_OUT_FLAG);
+		bGY_Data_Ready = false;
+	}else
+	if (!strncmp((char *)cmd_line, "GYRO_Z_ON", 9))
+	{
+		uiXLGYOutControl |=GY_Z_OUT_FLAG;
+		bXLGY_Reader_Ready = true;
+		bGY_Data_Ready = false;
+	}else
+	if (!strncmp((char *)cmd_line, "GYRO_Z_OFF", 10))
+	{
+		uiXLGYOutControl &=(~GY_Z_OUT_FLAG);
+		bGY_Data_Ready = false;
 	}
 }

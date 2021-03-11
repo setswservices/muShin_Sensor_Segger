@@ -38,7 +38,7 @@
  *
  */
 #include "sdk_common.h"
-#if MUSH_FEATURE_ENABLED(BLE_SPP_SERVICE)
+#if BLE_SPP_SERVICE_ENABLED
 #include "ble.h"
 #include "ble_spp.h"
 #include "ble_srv_common.h"
@@ -400,5 +400,5 @@ uint32_t ble_spp_data_send(ble_nus_t * p_nus,
 
 }
 
-#endif // MUSH_FEATURE_ENABLED(BLE_SPP_SERVICE)
+#endif // BLE_SPP_SERVICE_ENABLED
 

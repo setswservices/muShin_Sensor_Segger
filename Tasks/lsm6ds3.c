@@ -48,7 +48,10 @@
 
 TaskHandle_t			m_lsm6ds3_task = NULL;
 bool bLSM6DS3_Ready = false;
-#if MUSH_FEATURE_ENABLED(LSM6DS3)
+bool bXLGY_Reader_Ready = false;
+bool bXL_Data_Ready = false; 
+bool bGY_Data_Ready = false; 
+#if LSM6DS3_ENABLED
 #define LSM_QUEUE_LENGTH				( 4 )
 #define LSM_WAIT_DATA_MS				( 24 )
 
@@ -430,10 +433,10 @@ static ret_code_t  vLSM6DS3_SetUp(plsm6ds3_settings pSettingsYouWanted)
 		// Write 48h into MD1_CFG
 		writeRegister( LSM6DS3_ACC_GYRO_MD1_CFG, 0x48 );
 
-#if MUSH_FEATURE_ENABLED(LSM6DS3_WKUP)
+#if LSM6DS3_WKUP_ENABLED
 
 		nrfx_gpiote_in_event_enable(LSM6DS3_INT1_PIN, true);
-#endif // MUSH_FEATURE_ENABLED(LSM6DS3_WKUP)
+#endif // LSM6DS3_WKUP_ENABLED
 		
 	}
 
@@ -757,7 +760,7 @@ void vLSM6DS3TapStart(void)
 void vLSM6DS3Start( uint16_t usStackSize, portBASE_TYPE uxPriority )
 {
 
-#if MUSH_FEATURE_ENABLED(TASK_START_DEBUG)
+#if TASK_START_DEBUG_ENABLED
 	NRF_LOG_RAW_INFO("%s Entered ..\r\n", (uint32_t)__func__);
        NRF_LOG_FLUSH();
 #endif
@@ -803,17 +806,17 @@ static void vLSM6DS3Task( void *pvParameters )
 	uint8_t tempStatus;
 	uint8_t  data_wait_cnt;
 
-#if MUSH_FEATURE_ENABLED(TASK_START_DEBUG)
+#if TASK_START_DEBUG_ENABLED
 	NRF_LOG_RAW_INFO("%s Entering ..\r\n", __func__);
 #endif
 	
-#if MUSH_FEATURE_ENABLED(TASK_START_DEBUG)
+#if TASK_START_DEBUG_ENABLED
 	NRF_LOG_RAW_INFO("%s Waiting for I2C Master task started and AppTask check the WHO_I_AM register..\r\n", (uint32_t)__func__);
 #endif
 	// Wait until the I2C task will be ready and LSM6DS3 is functional ..
 	(void) ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 
-#if MUSH_FEATURE_ENABLED(GO_AHEAD_DEBUG)
+#if GO_AHEAD_DEBUG_ENABLED
 	PrintGotGoAhead((uint32_t)__func__);
 #endif
 	if (!bLSM6DS3_Ready) {
@@ -825,7 +828,7 @@ static void vLSM6DS3Task( void *pvParameters )
 	vLSM6DS3DefaultStart();
 //	vLSM6DS3fifoBegin();
 //	fifoClear();
-#if MUSH_FEATURE_ENABLED(TASK_START_DEBUG)
+#if TASK_START_DEBUG_ENABLED
 	NRF_LOG_RAW_INFO("%s: Start polling FIFO ..\r\n", __func__);
 #endif
 	pLsmMsg = &_msg;
@@ -961,10 +964,12 @@ portBASE_TYPE LSM_Rx(plsm6ds3Msg msg)
 {
 	if(!bLSM6DS3_Ready) return pdFAIL;
 	
+	bXLGY_Reader_Ready = false;  // Avoid for next call for RxXL()/RxGyro()
 	LSM_Take(NULL);
 	msg->lsm__doneCallback = LSM_OnDone;
 	LSM_MsgPut(msg);
 	LSM_MsgGet(msg);
+	bXLGY_Reader_Ready = true;
 	LSM_Give(NULL);
 	return pdPASS;
 }
@@ -972,24 +977,29 @@ portBASE_TYPE LSM_Rx(plsm6ds3Msg msg)
 portBASE_TYPE LSM_RxXL(float *x, float*y, float *z)
 {
 	lsm6ds3_msg_t msg;
+	
+	bXL_Data_Ready = false;
 	msg.req = MUSHIN_APP_XL_REQ;
 	LSM_Rx(&msg);
 	*x = msg.xl_data[0];
 	*y = msg.xl_data[1];
 	*z = msg.xl_data[2];
+	bXL_Data_Ready = true;  // The data can be obtained to output ..
 	return pdPASS;
 }
 
 portBASE_TYPE LSM_RxGyro(float *x, float*y, float *z)
 {
 	lsm6ds3_msg_t msg;
+	bGY_Data_Ready = false;
 	msg.req = MUSHIN_APP_GYRO_REQ;
 	LSM_Rx(&msg);
 	*x = msg.gyro_data[0];
 	*y = msg.gyro_data[1];
 	*z = msg.gyro_data[2];
+	bGY_Data_Ready = true;
 	return pdPASS;
 }
 
-#endif // MUSH_FEATURE_ENABLED(LSM6DS3)
+#endif // LSM6DS3_ENABLED
 

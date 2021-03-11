@@ -36,6 +36,15 @@
 #define CRANK_LEFT_OUT_FLAG	0x01
 #define CRANK_RIGHT_OUT_FLAG	0x02
 #define CRANK_DIGIFI_FLAG		0x04
+#define ACC_X_OUT_FLAG			0x01
+#define ACC_Y_OUT_FLAG			0x02
+#define ACC_Z_OUT_FLAG			0x04
+#define ACC_XYZ_OUT_FLAG		0x07
+#define GY_X_OUT_FLAG			0x08
+#define GY_Y_OUT_FLAG			0x10
+#define GY_Z_OUT_FLAG			0x20
+#define GY_XYZ_OUT_FLAG		0x38
+
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 // Data Types
@@ -79,9 +88,19 @@ typedef struct {
 // Global Variable Prototypes and Declarations
 ///////////////////////////////////////////////////////////////////////////////////////////////
 extern bool bLSM6DS3_Ready;
+extern bool bXLGY_Reader_Ready;
+extern bool bGY_Data_Ready; 
+extern bool bXL_Data_Ready; 
+extern float fXL_x, fXL_y, fXL_z;
+extern float fGY_x, fGY_y, fGY_z;
+
 extern uint32_t  uiGlobalTick;
 extern uint16_t  uiGlobalSysFlags;
 extern uint8_t  uiCrankOutControl;
+extern uint8_t  uiXLGYOutControl;
+
+extern float CrankDataRawThreshold;
+extern float CrankDataFilteredThreshold;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 // Tasks pointers

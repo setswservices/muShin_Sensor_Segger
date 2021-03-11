@@ -4,7 +4,7 @@
 //
 //	File Name:		mushin_config.h
 //	Author(s):		Jeffery Bahr, Dmitriy Antonets
-//	Copyright Notice:	Copyright, 2019, ?? Inc
+//	Copyright Notice:	Copyright, 2019, muShin Inc
 //
 //	Purpose/Functionality:	Defines that control the build type, global externs for functions and variables 
 //
@@ -58,20 +58,24 @@
 //
 ///////////////////////////////////////////////////////////
 
+// [ADK] 2021-02-26  Changes for new scheme ..
 
+#define NEW_HW_SCHEME_ENABLED				1
 #define APP_ENABLED								1
 #define LSM6DS3_ENABLED						1
+#define LSM6DS3_BLE_OUTPUT_ENABLED			1
 #define TIMER2_COUNTER_ENABLED				0
 #define AD8237_ENABLED							1
 #define SAADC_AIN0_ENABLED					1
 #define SAADC_AIN1_ENABLED					1
 #define SAADC_AIN2_ENABLED					1
-#define SAADC_AIN3_ENABLED					1
+#define SAADC_AIN3_ENABLED					0
 #define SAADC_DIFF_AIN13_ENABLED				0
 #define SAADC_DIFF_AIN23_ENABLED				0
 #define SAADC_DIFF_AIN01_ENABLED				0
 #define SAADC_AIN4_ENABLED					0
 #define SAADC_AIN5_ENABLED					0
+
 
 ///////////////////////////////////////////////////////////
 //
@@ -81,9 +85,9 @@
 ///////////////////////////////////////////////////////////
 
 #define LOG_TASK_NOTIFICATION_ENABLED		1
-#define TASK_START_DEBUG_ENABLED				1
-#define GO_AHEAD_DEBUG_ENABLED				1
-#define MEMORY_DEBUG_ENABLED					0
+#define TASK_START_DEBUG_ENABLED		1
+#define GO_AHEAD_DEBUG_ENABLED			1
+#define MEMORY_DEBUG_ENABLED			1
 #define LSM6DS3_DEBUG_ENABLED					1
 #define LSM6DS3_MAG_RAW_DEBUG_ENABLED		0
 #define LSM6DS3_ACC_RAW_DEBUG_ENABLED		0
@@ -103,7 +107,7 @@
 #define	LSM6DS3_PRIORITY				( tskIDLE_PRIORITY + 4 )
 #define	TWI0_PRIORITY					( tskIDLE_PRIORITY + 3 )
 
-#define	APP_STACKSIZE					( 128 )
+#define	APP_STACKSIZE					( 256 ) // was 128
 #define	LSM6DS3_STACKSIZE				( 250 )
 #define	TWI0_STACKSIZE				( 550 )
 #define 	CMD_LINE_MAX_LEN				(64)
@@ -120,7 +124,7 @@ typedef enum {
 ///////////////////////////////////////////////////////
 // ADC scanner parameters
 ///////////////////////////////////////////////////////
-#define ADC_SAMPLES_IN_BUFFER		(4)
+#define ADC_SAMPLES_IN_BUFFER		(3)
 #define ADC_POOL_SIZE		((SAADC_AIN0_ENABLED + SAADC_AIN1_ENABLED + SAADC_AIN2_ENABLED + SAADC_AIN3_ENABLED + SAADC_AIN4_ENABLED + SAADC_AIN5_ENABLED  + SAADC_DIFF_AIN13_ENABLED + SAADC_DIFF_AIN23_ENABLED + SAADC_DIFF_AIN01_ENABLED) * ADC_SAMPLES_IN_BUFFER)
 
 #define SAMPLES_RB_SIZE		512

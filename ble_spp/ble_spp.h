@@ -71,7 +71,7 @@
 #include "nrf_sdh_ble.h"
 #include "ble_link_ctx_manager.h"
 
-#if MUSH_FEATURE_ENABLED(BLE_SPP_SERVICE)
+#if BLE_SPP_SERVICE_ENABLED
 
 #ifdef __cplusplus
 extern "C" {
@@ -192,10 +192,10 @@ struct ble_nus_s
     ble_gatts_char_handles_t        tx_handles;         /**< Handles related to the TX characteristic (as provided by the SoftDevice). */
     ble_gatts_char_handles_t        rx_handles;         /**< Handles related to the RX characteristic (as provided by the SoftDevice). */
 #if 0
-// #if MUSH_FEATURE_ENABLED(BLE_SPP_SERVICE)
+// #if BLE_SPP_SERVICE_ENABLED
     ble_gatts_char_handles_t        tx_cmd_handles;         /**< Handles related to the TX characteristic (as provided by the SoftDevice). */
     ble_gatts_char_handles_t        rx_cmd_handles;         /**< Handles related to the RX characteristic (as provided by the SoftDevice). */
-#endif // MUSH_FEATURE_ENABLED(BLE_SPP_SERVICE)
+#endif // BLE_SPP_SERVICE_ENABLED
     blcm_link_ctx_storage_t * const p_link_ctx_storage; /**< Pointer to link context storage with handles of all current connections and its context. */
     ble_nus_data_handler_t          data_handler;       /**< Event handler to be called for handling received data. */
 };
@@ -249,7 +249,7 @@ uint32_t ble_spp_data_send(ble_nus_t * p_nus,
 }
 #endif
 
-#endif //MUSH_FEATURE_ENABLED(BLE_SPP_SERVICE)
+#endif //BLE_SPP_SERVICE_ENABLED
 #endif // BLE_NUS_H__
 
 /** @} */

@@ -14,10 +14,6 @@
 #ifndef APP_CONFIG_H
 #define APP_CONFIG_H
 
-//lint -emacro(491,MUSH_FEATURE_ENABLED) // Suppers warning 491 "non-standard use of 'defined' preprocessor operator"
-#define MUSH_FEATURE_ENABLED(feature) \
-    ((defined(feature ## _ENABLED) && (feature ## _ENABLED)) ? 1 : 0)
-
 #define APP_USE_DK_BOARD						0
 #define BLE_SPP_SERVICE_ENABLED				0
 #define BLE_NUS_SERVICE_ENABLED				1
@@ -25,9 +21,9 @@
 #define BLE_HRS_ENABLED						0
 #define NRF_SDH_BLE_GATT_MAX_MTU_SIZE		100
 
-#if MUSH_FEATURE_ENABLED(BLE_NUS_SERVICE)
+#if BLE_NUS_SERVICE_ENABLED
 #define BLE_NUS_ENABLED 						1
-#endif // MUSH_FEATURE_ENABLED(BLE_NUS_SERVICE)
+#endif // BLE_NUS_SERVICE_ENABLED
 
 
 #define TWI_ENABLED 							1
@@ -57,6 +53,7 @@
 /*  +3.3V_POT signal */
 #define  ADC_POWER_PIN							7
 #define  ADC_VREF_PIN							23
+#define  PAIRING_LED_PIN						14
 #if TIMER_ENABLED
 #define ENABLED_TIMER_COUNT (TIMER0_ENABLED+TIMER1_ENABLED+TIMER2_ENABLED+TIMER3_ENABLED+TIMER4_ENABLED)
 #endif
@@ -64,11 +61,12 @@
 #define NRF_LOG_BUFSIZE   8192
 #define NRF_LOG_DEFERRED  0
 	
-#define NRF_LOG_BACKEND_RTT_ENABLED		1
+#define NRF_LOG_BACKEND_RTT_ENABLED	1
 #define NRF_LOG_BACKEND_UART_ENABLED	0
 
-#define APP_TICK_INTERVAL         			(1)                                    /**< Application level measurement interval (ms). */
-#define PRINT_SEND_DELAY_IN_MSEC		10
+#define APP_TICK_INTERVAL         	(1)                                    /**< Application level measurement interval (ms). */
+#define PRINT_SEND_DELAY_IN_MSEC	10
 #define ADC_SAMPLING_TIME_IN_MSEC	10
 
+#define PASSKEY_SERVICE_ENABLED         1
 #endif

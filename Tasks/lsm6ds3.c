@@ -47,10 +47,12 @@
 #include "lsm6ds3.h"
 
 TaskHandle_t			m_lsm6ds3_task = NULL;
+/*
 bool bLSM6DS3_Ready = false;
 bool bXLGY_Reader_Ready = false;
 bool bXL_Data_Ready = false; 
 bool bGY_Data_Ready = false; 
+*/
 #if LSM6DS3_ENABLED
 #define LSM_QUEUE_LENGTH				( 4 )
 #define LSM_WAIT_DATA_MS				( 24 )
@@ -817,7 +819,7 @@ static void vLSM6DS3Task( void *pvParameters )
 	(void) ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 
 #if GO_AHEAD_DEBUG_ENABLED
-	PrintGotGoAhead((uint32_t)__func__);
+	PrintGotGoAhead((uint32_t *)__func__);
 #endif
 	if (!bLSM6DS3_Ready) {
 		vTaskDelete(NULL);

@@ -31,6 +31,7 @@
 #include "task.h"
 #include "timers.h"
 #include "semphr.h"
+#include "event_groups.h"
 #include "fds.h"
 #include "ble_conn_state.h"
 #include "nrf_ble_gatt.h"

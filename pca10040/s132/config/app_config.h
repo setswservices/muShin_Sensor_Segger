@@ -19,7 +19,7 @@
 #define BLE_NUS_SERVICE_ENABLED				1
 #define NRF_SDH_BLE_VS_UUID_COUNT			1
 #define BLE_HRS_ENABLED						0
-#define NRF_SDH_BLE_GATT_MAX_MTU_SIZE		100
+#define NRF_SDH_BLE_GATT_MAX_MTU_SIZE		240
 
 #if BLE_NUS_SERVICE_ENABLED
 #define BLE_NUS_ENABLED 						1
@@ -45,6 +45,8 @@
 // For ADCs inputs..
 #define TIMER_ENABLED 							1
 #define NRFX_TIMER_ENABLED 					1
+#define TIMER3_ENABLED 							1 //Timer used for systicks
+#define NRFX_TIMER3_ENABLED					1
 #define TIMER4_ENABLED 							1 //Timer used for adc (via ppi)
 #define NRFX_TIMER4_ENABLED					1
 #define SAADC_ENABLED 							1
@@ -57,6 +59,9 @@
 #if TIMER_ENABLED
 #define ENABLED_TIMER_COUNT (TIMER0_ENABLED+TIMER1_ENABLED+TIMER2_ENABLED+TIMER3_ENABLED+TIMER4_ENABLED)
 #endif
+
+#define NRF_LOG_BACKEND_RTT_ENABLED		1
+#define NRF_LOG_BACKEND_UART_ENABLED	0
 
 #define NRF_LOG_BUFSIZE   8192
 #define NRF_LOG_DEFERRED  0

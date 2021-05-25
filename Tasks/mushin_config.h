@@ -58,9 +58,7 @@
 //
 ///////////////////////////////////////////////////////////
 
-// [ADK] 2021-02-26  Changes for new scheme ..
 
-#define NEW_HW_SCHEME_ENABLED				1
 #define APP_ENABLED								1
 #define LSM6DS3_ENABLED						1
 #define LSM6DS3_BLE_OUTPUT_ENABLED			1
@@ -103,13 +101,18 @@
 // Task Priorities and Stack Sizes
 ///////////////////////////////////////////////////////
 
-#define	APP_PRIORITY					( tskIDLE_PRIORITY + 3 )
-#define	LSM6DS3_PRIORITY				( tskIDLE_PRIORITY + 4 )
-#define	TWI0_PRIORITY					( tskIDLE_PRIORITY + 3 )
+#define	APP_PRIORITY					( tskIDLE_PRIORITY + 2 )
+#define	LSM6DS3_PRIORITY				( tskIDLE_PRIORITY + 2 )
+#define	TWI0_PRIORITY					( tskIDLE_PRIORITY + 2 )
+#define	EMU_PRIORITY					( tskIDLE_PRIORITY + 2 )
+#define	DATA_PRIORITY					( tskIDLE_PRIORITY + 2 )
 
 #define	APP_STACKSIZE					( 256 ) // was 128
 #define	LSM6DS3_STACKSIZE				( 250 )
 #define	TWI0_STACKSIZE				( 550 )
+#define	EMU_STACKSIZE					( 128 ) 
+#define	DATA_STACKSIZE				( 256 ) 
+
 #define 	CMD_LINE_MAX_LEN				(64)
 
 
@@ -120,6 +123,14 @@ typedef enum {
 	LSM6DS3_MODE_DEFAULT 		 = 0x00,
 	LSM6DS3_MODE_HWTAP 		 	 = 0x01,
 } LSM6DS3_MODE_t;
+
+typedef enum {
+	MUSHIN_TASK_NOT_ACTIVE,
+	MUSHIN_TASK_MAY_ACTIVATE,	
+	MUSHIN_TASK_ACTIVE,
+	MUSHIN_TASK_NEED_SUSPEND,
+	MUSHIN_TASK_SUSPENDED,
+} mushin_task_cntrl_t;		
 	
 ///////////////////////////////////////////////////////
 // ADC scanner parameters
@@ -127,10 +138,21 @@ typedef enum {
 #define ADC_SAMPLES_IN_BUFFER		(3)
 #define ADC_POOL_SIZE		((SAADC_AIN0_ENABLED + SAADC_AIN1_ENABLED + SAADC_AIN2_ENABLED + SAADC_AIN3_ENABLED + SAADC_AIN4_ENABLED + SAADC_AIN5_ENABLED  + SAADC_DIFF_AIN13_ENABLED + SAADC_DIFF_AIN23_ENABLED + SAADC_DIFF_AIN01_ENABLED) * ADC_SAMPLES_IN_BUFFER)
 
-#define SAMPLES_RB_SIZE		512
+#define SAMPLES_RB_SIZE		256
+#define OUTPUT_RB_SIZE			8
+#define MUSHIN_BLE_BINARY_PKT		(1)
+
 extern	void *get_samples_rb_ctrl(void);
-extern	void samples_rb_read(void *arg,  uint16_t *s0, uint16_t *s1, uint16_t *s2, uint16_t *s3);
+extern	void samples_rb_read(void *arg,  uint32_t *s0, uint32_t *s1, uint32_t *s2 /*, uint16_t *s3*/);
 extern	int16_t samples_rb_available_size(void *arg);
+extern void *get_outbuf_rb_ctrl(void);
+extern void outbuf_rb_read(void *arg,  char *data);
+extern void outbuf_rb_write(void *arg,  char *data);
+extern int8_t outbuf_rb_available_size(void *arg);
+extern int8_t outbuf_rb_free_size(void *arg);
+void vOutStart( uint16_t usStackSize, portBASE_TYPE uxPriority );
+
+
 
 
 #endif // MUSHIN_CONFIG_H	
